@@ -1,0 +1,81 @@
+[<AutoOpen>]
+module FSharp.TypeLevel.Lambda
+open FSharp.TypeLevel
+open TypeLevelOperators
+
+module LambdaOp =
+  [<Struct>] type Subst = Subst
+  [<Struct>] type Shift = Shift
+
+  let inline lambdaop (x: ty< ^x >) arg : _
+    when ^x: (static member Eval: ty< ^x > -> ty< ^X >) =
+    eval' (^X: (static member LambdaOp: ty< ^X > * _ -> ty< ^X' >) ty< ^X >, arg)
+
+  let inline subst var value x = lambdaop x (Z', (Subst, var, value))
+  let inline shift isAdd d x = lambdaop x (Z', (Shift, isAdd, d))
+
+open LambdaOp
+
+type Var<'nat> = struct end
+type Lam<'term> = struct end
+type App<'term1, 'term2> = struct end
+
+let inline private var' (_: ty< ^n>) = ty<Var< ^n>>
+let inline private lam' (_: ty< ^t>) = ty<Lam< ^t>>
+let inline private app' (_: ty< ^a>, _: ty< ^b>) = ty<App< ^a, ^b>>
+
+let inline private ifte (_: ty< ^c >) (_: ty< ^l >) (_: ty< ^r >) =
+  ty<IfThenElse< ^c, ^l, ^r >>
+let inline private lt (x: ty< ^x >) (y: ty< ^y >) = ty<LT< ^x, ^y >>
+let inline private eq (x: ty< ^x >) (y: ty< ^y >) = ty<Eq< ^x, ^y >>
+let inline private add (x: ty< ^x >) (y: ty< ^y >) = ty<Add< ^x, ^y >>
+
+type Var<'nat> with
+  static member inline Eval (_: ty<Var< ^n >>) = var' (eval' ty< ^n >)
+  static member inline LambdaOp (self: ty<Var< ^n >>, (c, (Subst, var, value))) =
+    let n = ty< ^n >
+    ifte (eq (add c var) n)
+      (shift true' c value)
+      self
+  static member inline LambdaOp (self: ty<Var< ^n >>, (c, (Shift, _: ty<True>, d))) =
+    let n = ty< ^n >
+    ifte (lt n c)
+      self
+      (var' (add n d))
+  static member inline LambdaOp (self: ty<Var<Z>>, (_, (Shift, _: ty<False>, _))) = self
+  static member inline LambdaOp (self: ty<Var<S< ^n >>>, (c: ty< ^c >, (Shift, _: ty<False>, d: ty<S<Z>>))) =
+    ifte (lt ty<S< ^n >> c)
+      self
+      (var' ty< ^n >)
+  static member inline Apply (l: ty<Var< ^n >>, r: ty< ^x >) = app' (l ,eval' r)
+
+type Lam<'term> with
+  static member inline Eval (_: ty<Lam< ^t >>) = lam' (eval' ty< ^t >)
+  static member inline LambdaOp (_: ty<Lam< ^t >>, (c, arg)) =
+    lam'
+      (lambdaop ty< ^t > (S' c, arg))
+  static member inline Apply (l: ty<Lam< ^b >>, r: ty< ^x >) =
+    shift false' (S' Z')
+      (subst Z'
+        (shift true' (S' Z') r)
+        ty< ^b >)
+    |> eval'
+
+let inline private apply (l: ty< ^l >, r: ty< ^r >) =
+  ((^l or ^r): (static member Apply: ty< ^l > * ty< ^r > -> ty< ^result >) l,r)
+
+type App<'term1, 'term2> with
+  static member inline LambdaOp (self: ty<App< ^t1, ^t2 >>, arg: 'arg) : _
+    when (^t1 or ^t2): (static member LambdaOp: ty< ^t1 > * 'arg -> ty< ^T1 >)
+     and (^t2 or ^t1): (static member LambdaOp: ty< ^t2 > * 'arg -> ty< ^T2 >) = ty<App< ^T1, ^T2 >>
+  static member inline Eval (_: ty<App< ^l, ^r >>) =
+    apply (eval' ty< ^l >, ty< ^r >)
+  static member inline Apply (l: ty<App<_, _>>, r: ty< ^x >) =
+    app' (l, eval' r)
+
+module TypeLevelOperators =
+  let inline var' (_: ty<'n>) = eval' ty<Var<'n>>
+  let inline lam' (_: ty<'t>) = eval' ty<Lam<'t>>
+  let inline app' (f: ty< ^f >) (x: ty< ^x >) = apply (eval' f, x)
+  let inline (|>^) (x: ty< ^x >) (f: ty< ^f >) = app' f x
+  let inline (<|^) (f: ty< ^f >) (x: ty< ^x >) = app' f x 

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="prelude.fs" />
+    <Compile Include="TypeWrapper.fs" />
+    <Compile Include="Boolean.fs" />
+    <Compile Include="Natural.fs" />
+    <Compile Include="Lambda.fs" />
+    <Compile Include="List.fs" />
+    <Compile Include="DataTypes.fs" />
+    <Compile Include="Tests.fs" />
+  </ItemGroup>
+</Project>
