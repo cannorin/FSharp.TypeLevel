@@ -1,9 +1,8 @@
-module private FSharp.TypeLevel.Tests
+module FSharp.TypeLevel.Tests
 open FSharp.TypeLevel
 open TypeLevelOperators
 
 assert' (not' (not' true'))
-
 assert' ((not' true' ||^ true') &&^ not' false')
 
 let one = S' Z'
@@ -13,7 +12,6 @@ let two   = three -^ one
 let six   = five +^ two -^ one
 
 assert' (six =^ three +^ three)
-
 assert' (not' (six >^ three &&^ five -^ one <=^ two +^ one))
 
 let S =
@@ -23,8 +21,9 @@ let K =
   // \x \y x
   lam' (lam' (var' (S' Z')))
 
-let I = lam' (var' Z')
+let I  = lam' (var' Z')
 let I2 = app' (app' S K) K
+assert' (I =^ I2)
 
 let T = K
 let F = S <|^ K
@@ -32,16 +31,26 @@ let F = S <|^ K
 let NOT =
   S <|^ (S <|^ I <|^ (K <|^ F)) <|^ (K <|^ T)
 
-let x = T |>^ NOT |>^ NOT
+let notnotT = T |>^ NOT |>^ NOT
+assert' (notnotT =^ T)
+
+let seven =
+  let' five (
+    let' two (
+      var' Z' +^ var' one ))
+assert' (seven =^ one +^ six)
 
 let xs =
   nil' |> cons' (S' Z')
        |> cons' (Z' +^ Z')
        |> cons' (S' (S' Z'))
 
+let xsSum =
+  xs |> fold' (lam' (lam' (var' Z' +^ var' one))) Z'
+assert' (xsSum =^ three)
+
 let xs' =
-  let f = lam' (S' (S' Z') +^ var' Z')
-  xs |> LIST.MAP f
+  xs |> map' (lam' (S' (S' Z') +^ var' Z'))
 
 let ys =
   nil' |> cons' (S' (S' Z') +^ S' Z')
@@ -50,7 +59,7 @@ let ys =
        |> cons' (S' Z' +^ S' Z')
 
 let zs =
-  LIST.APPEND xs ys
+  List'.append xs ys
 
-let zsContainsZero = zs |> LIST.CONTAINS Z'
+let zsContainsZero = zs |> List'.contains Z'
 assert' zsContainsZero

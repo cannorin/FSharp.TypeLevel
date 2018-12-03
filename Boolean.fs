@@ -1,60 +1,86 @@
 [<AutoOpen>]
 module FSharp.TypeLevel.Boolean
-open FSharp.TypeLevel.TypeWrapper.TypeLevelOperators
+open TypeLevelOperators
 
-type True = struct end with
-  static member inline Eval x = x
-  static member inline LambdaOp (x, _) = x
-  static member inline IfThenElse (_: ty<True>, x, y) = x
+type True =
+  static member inline Kind = Kind.Bool
+  static member inline Eval self = self
 
-type False = struct end with
-  static member inline Eval x = x
-  static member inline LambdaOp (x, _) = x
-  static member inline IfThenElse (_: ty<False>, x, y) = y 
+type False =
+  static member inline Kind = Kind.Bool
+  static member inline Eval self = self
+
+[<RequireQualifiedAccess>]
+module BoolOp =
+  type IfThenElse = IfThenElse
 
 type True with
-  static member inline Eq (_: ty<True>, _: ty<True>) = ty<True>
+  static member inline Op (Kind.LambdaExpr, _, _, _, d) = d
+  static member inline Op (Kind.Bool, Op.Eq, _:ty<True>, _:ty<True>, _) = ty<True>
+  static member inline Op (Kind.Bool, Op.Eq, _:ty<True>, _:ty<False>, _) = ty<False>
+  static member inline Op (Kind.Bool, BoolOp.IfThenElse, _: ty<True>, (l, r), _) = eval' l
 
 type False with
-  static member inline Eq (_: ty<True>, _: ty<False>) = ty<False>
-  static member inline Eq (_: ty<False>, _: ty<False>) = ty<True>
-  static member inline Eq (_: ty<False>, _: ty<True>) = ty<False>
+  static member inline Op (Kind.LambdaExpr, _, _, _, d) = d
+  static member inline Op (Kind.Bool, Op.Eq, _:ty<False>, _:ty<True>, _) = ty<False>
+  static member inline Op (Kind.Bool, Op.Eq, _:ty<False>, _:ty<False>, _) = ty<True>
+  static member inline Op (Kind.Bool, BoolOp.IfThenElse, _: ty<False>, (l, r), _) = eval' r
 
-type Assert< ^X when ^X: (static member Eval: ty< ^X > -> ty<True>) > = struct end with
-  static member inline Eval (_: ty<Assert<_>>) = ty<Unit>
+type IfThenElse<'condition, 'left, 'right> =
+  static member inline Eval (_: ty<IfThenElse< ^c, ^l, ^r >>) : _
+    when ^c: (static member Eval: ty< ^c > -> ty< ^C >) =
+    Kind.op (
+      Kind.Bool,
+      BoolOp.IfThenElse,
+      ty< ^C >,
+      (ty< ^l >, ty< ^r >),
+      ty<IfThenElse< ^C, ^l, ^r >>
+    )
 
-type Not<'a> = struct end with
-  static member inline Eval (_: ty<Not< ^A >>) : ty< ^B >
-    when ^A: (static member Eval: ty< ^A > -> ty< ^Bool >) =
-    (^Bool: (static member IfThenElse: ty< ^Bool > * _ * _ -> ty< ^B >) ty< ^Bool >, ty<False>, ty<True>)
+type Not<'bool> =
+  static member inline Eval (_: ty<Not< ^b >>) : ty< ^b' > =
+    eval' ty<IfThenElse< ^b, False, True >>
 
-type And<'a, 'b> = struct end with
-  static member inline Eval (_: ty<And< ^A, ^B >>) : ty< ^C >
-    when ^A: (static member Eval: ty< ^A > -> ty< ^A' >)
-     and ^B: (static member Eval: ty< ^B > -> ty< ^B' >) =
-    (^A': (static member IfThenElse: _*_*_ -> ty< ^C >) ty< ^A' >,ty< ^B' >,ty<False>)
+type And<'left, 'right> =
+  static member inline Eval (_: ty<And< ^l, ^r >>) =
+    eval' ty<IfThenElse< ^l, ^r, False>>
 
-type Or<'a, 'b>  = struct end with
-  static member inline Eval (_: ty<Or< ^A, ^B >>) : ty< ^C >
-    when ^A: (static member Eval: ty< ^A > -> ty< ^A' >)
-     and ^B: (static member Eval: ty< ^B > -> ty< ^B' >) =
-    (^A': (static member IfThenElse: _*_*_ -> ty< ^C >) ty< ^A' >,ty<True>,ty< ^B' >)
-
-type IfThenElse<'_bool, 'a, 'b> = struct end with
-  static member inline Eval (_: ty<IfThenElse< ^X, ^A, ^B>>) : ty< ^EvalAorB >
-    when ^X: (static member Eval: ty< ^X > -> ty< ^Bool >) =
-    (^Bool: (static member IfThenElse: _*_*_ -> ty< ^EvalAorB >) ty< ^Bool >,eval' ty< ^A >,eval' ty< ^B >)
-
-type Eq<'a, 'b> = struct end with
-  static member inline Eval (_: ty<Eq< ^A, ^B >>) : ty< ^Bool > = ty< ^A > =^ ty< ^B >
+type Or<'left, 'right> =
+  static member inline Eval (_: ty<Or< ^l, ^r >>) =
+    eval' ty<IfThenElse< ^l, True, ^r>>
 
 module TypeLevelOperators =
   let inline assert' (_: ty< ^X >) : unit
     when ^X: (static member Eval: ty< ^X > -> ty<True>) = ()
   let true' = ty<True>
   let false' = ty<False>
-  let inline not' (_: ty< ^a >) = eval' ty<Not< ^a >>
-  let inline ifthenelse' (_: ty< ^cond >) (_: ty< ^a >) (_: ty< ^b >) =
-    eval' ty<IfThenElse< ^cond, ^a, ^b >>
-  let inline (&&^) (_: ty< ^a >) (_: ty< ^b >) = eval' ty<And< ^a, ^b>>
-  let inline (||^) (_: ty< ^a >) (_: ty< ^b >) = eval' ty<Or< ^a, ^b>>
+  let inline ifthenelse' (_: ty< ^cond >) (_: ty< ^l >) (_: ty< ^r >) =
+    eval' ty<IfThenElse< ^cond, ^l, ^r>>
+  let inline not' (_: ty< ^x >) = eval' ty<Not< ^x >>
+  let inline (&&^) (_: ty< ^x >) (_: ty< ^y >) = eval' ty<And< ^x, ^y >>
+  let inline (||^) (_: ty< ^x >) (_: ty< ^y >) = eval' ty<Or< ^x, ^y >>
+open TypeLevelOperators
+
+type IfThenElse<'c, 'a, 'b> with
+  static member inline Op (Kind.LambdaExpr, op, _: ty<IfThenElse< ^c, ^a, ^b >>, arg, _) =
+    ifthenelse'
+      (Kind.op (Kind.LambdaExpr, op, eval' ty< ^c >, arg, eval' ty< ^c >))
+      (Kind.op (Kind.LambdaExpr, op, eval' ty< ^a >, arg, eval' ty< ^a >))
+      (Kind.op (Kind.LambdaExpr, op, eval' ty< ^b >, arg, eval' ty< ^b >))
+
+type Not<'b> with
+  static member inline Op (Kind.LambdaExpr, op, _: ty<Not< ^b >>, arg, _) =
+    not'
+      (Kind.op (Kind.LambdaExpr, op, eval' ty< ^b >, arg, eval' ty< ^b >))
+
+type And<'a, 'b> with
+  static member inline Op (Kind.LambdaExpr, op, _: ty<And< ^a, ^b >>, arg, _) =
+    (&&^)
+      (Kind.op (Kind.LambdaExpr, op, eval' ty< ^a >, arg, eval' ty< ^a >))
+      (Kind.op (Kind.LambdaExpr, op, eval' ty< ^b >, arg, eval' ty< ^b >))
+
+type Or<'a, 'b> with
+  static member inline Op (Kind.LambdaExpr, op, _: ty<Or< ^a, ^b >>, arg, _) =
+    (||^)
+      (Kind.op (Kind.LambdaExpr, op, eval' ty< ^a >, arg, eval' ty< ^a >))
+      (Kind.op (Kind.LambdaExpr, op, eval' ty< ^b >, arg, eval' ty< ^b >))

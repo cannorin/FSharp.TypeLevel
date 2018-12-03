@@ -5,7 +5,9 @@
   <ItemGroup>
     <Compile Include="prelude.fs" />
     <Compile Include="TypeWrapper.fs" />
+    <Compile Include="Abstractions.fs" />
     <Compile Include="Boolean.fs" />
+    <Compile Include="Unit.fs" />
     <Compile Include="Natural.fs" />
     <Compile Include="Lambda.fs" />
     <Compile Include="List.fs" />

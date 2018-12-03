@@ -2,79 +2,97 @@
 module FSharp.TypeLevel.Natural
 open TypeLevelOperators
 
-type Z = struct end with
+type Z =
+  static member inline Kind = Kind.Nat
   static member inline Eval x = x
-  static member inline LambdaOp (x, _) = x
-  static member inline Add (_: ty<Z>, y) = eval' y
 
-type S<'n> = struct end with
+type S<'nat> =
+  static member inline Kind = Kind.Nat
   static member inline Eval (_: ty<S< ^N >>) : _
     when ^N: (static member Eval: ty< ^N > -> ty< ^N' >) = ty<S< ^N' >>
-  static member inline LambdaOp (_: ty<S< ^N >>, _: ^arg) : _
-    when ^N: (static member LambdaOp: ty< ^N > * ^arg -> ty< ^N' >) = ty<S< ^N' >>
-  static member inline Add (_: ty<S< ^X >>, _: ty< ^Y >) : _
-    when ^X: (static member Eval: ty< ^X > -> ty< ^X' >)
-     and ^X': (static member Add: ty< ^X' > * ty< ^Y > -> ty< ^Z >) =
-    ty<S< ^Z >>
 
-type Add<'x, 'y> = struct end with
-  static member inline Eval (_: ty<Add< ^X, ^Y>>) : _
-    when ^X: (static member Eval: ty< ^X > -> ty< ^X' >) =
-    (^X': (static member Add: _*_ -> _) ty< ^X' >,ty< ^Y >)
+[<RequireQualifiedAccess>]
+module NatOp =
+  type Sub = Sub
+  type Gt = Gt
 
-type Z with
-  static member inline Eq (_: ty<Z>, _: ty<Z>) = true'
-  static member inline Eq (_: ty<Z>, _: ty<S<_>>) = false'
-  static member inline Eq (_: ty<S<_>>, _: ty<Z>) = false'
-  static member inline Sub (x, _: ty<Z>) = eval' x
+let inline private s (x: ty<'x>) = ty<S<'x>>
 
-type S<'n> with
-  static member inline Eq (_: ty<S< ^M >>, _: ty<S< ^N >>) =
-    ((^M or ^N): (static member Eq: ty< ^M > * ty< ^N > -> ty< ^Bool >) ty< ^M >, ty< ^N >)
-  static member inline Sub (_: ty<S< ^X> >, _: ty<S< ^Y >>) : _
-    when ^X: (static member Eval: ty< ^X > -> ty< ^X' >)
-     and ^Y: (static member Eval: ty< ^Y > -> ty< ^Y' >)
-     and ^Y': (static member Sub: ty< ^X' > * ty< ^Y' > -> ty< ^Z >) =
-    ty< ^Z >
+type Sub<'a, 'b> =
+  static member inline Eval (_: ty<Sub< ^x, ^y >>) : _
+    when ^x: (static member Eval: ty< ^x > -> ty< ^X >)
+     and ^y: (static member Eval: ty< ^y > -> ty< ^Y >) =
+    Kind.op (Kind.Nat, NatOp.Sub, ty< ^Y >, ty< ^X >, ty<Sub< ^X, ^Y >>)
 
-type Sub<'x, 'y> = struct end with
-  static member inline Eval (_: ty<Sub< ^X, ^Y>>) : _
-    when ^X: (static member Eval: ty< ^X > -> ty< ^X' >)
-     and ^Y: (static member Eval: ty< ^Y > -> ty< ^Y' >) =
-    (^Y': (static member Sub: _*_ -> _) ty< ^X' >,ty< ^Y' >)
+type GT<'a, 'b> =
+  static member inline Eval (_: ty<GT< ^x, ^y >>) : _
+    when ^x: (static member Eval: ty< ^x > -> ty< ^X >)
+     and ^y: (static member Eval: ty< ^y > -> ty< ^Y >) =
+    Kind.op (Kind.Nat, NatOp.Gt, ty< ^X >, ty< ^Y >, ty<GT< ^X, ^Y >>)
 
-type Z with
-  static member inline Gt (_: ty<S<_>>, _: ty<Z>) = ty<True>
-  static member inline Gt (_: ty<Z>, _) = ty<False>
-
-type S<'n> with
-  static member inline Gt (_: ty<S< ^X >>, _: ty<S< ^Y >>) : _
-    when ^X: (static member Eval: ty< ^X > -> ty< ^X' >)
-     and ^Y: (static member Eval: ty< ^Y > -> ty< ^Y' >)
-     and (^X' or ^Y'): (static member Gt: ty< ^X' > * ty< ^Y' > -> ty< ^Z >) =
-    ty< ^Z >
-
-type GT<'x, 'y> = struct end with
-  static member inline Eval (_: ty<GT< ^X, ^Y>>) : _
-    when ^X: (static member Eval: ty< ^X > -> ty< ^X' >)
-     and ^Y: (static member Eval: ty< ^Y > -> ty< ^Y' >) =
-    ((^X' or ^Y'): (static member Gt: _*_ -> _) ty< ^X' >,ty< ^Y' >)
-
-type LT<'x, 'y> = struct end with
-  static member inline Eval (_: ty<LT< ^X, ^Y>>) : _
-    when ^X: (static member Eval: ty< ^X > -> ty< ^X' >)
-     and ^Y: (static member Eval: ty< ^Y > -> ty< ^Y' >) =
-    ((^X' or ^Y'): (static member Gt: _*_ -> _) ty< ^Y' >,ty< ^X' >)
+type LT<'a, 'b> =
+  static member inline Eval (_: ty<LT< ^x, ^y >>) : _
+    when ^x: (static member Eval: ty< ^x > -> ty< ^X >)
+     and ^y: (static member Eval: ty< ^y > -> ty< ^Y >) =
+    Kind.op (Kind.Nat, NatOp.Gt, ty< ^Y >, ty< ^X >, ty<LT< ^X, ^Y >>)
 
 type GTE<'x, 'y> = Or<GT<'x, 'y>, Eq<'x, 'y>>
 type LTE<'x, 'y> = Or<LT<'x, 'y>, Eq<'x, 'y>>
 
+type Z with
+  static member inline Op (Kind.LambdaExpr, _, _, _, d) = d
+  static member inline Op (Kind.Nat, Op.Eq, _: ty<Z>, _: ty<Z>, _) = true'
+  static member inline Op (Kind.Nat, Op.Eq, _: ty<Z>, _: ty<S<_>>, _) = false'
+  static member inline Op (KindAbstract.Semigroup, SemigroupOp.Add, _: ty<Z>, x, _) = eval' x
+  static member inline Op (Kind.Nat, NatOp.Sub, _: ty<Z>, x, _) = x
+  static member inline Op (Kind.Nat, NatOp.Gt, _: ty<Z>, _: ty<Z>, _) = false'
+  static member inline Op (Kind.Nat, NatOp.Gt, _: ty<Z>, _: ty<S<_>>, _) = false'
+  static member inline Op (Kind.Nat, NatOp.Gt, _: ty<Z>, _: ty< ^tm >, d) : _
+    when ^tm: (static member Kind: Kind.LambdaExpr) = d
+
+type S<'nat> with
+  static member inline Op (Kind.LambdaExpr, op, _: ty<S< ^n >>, arg, _) =
+    s <| Kind.op (Kind.LambdaExpr, op, ty< ^n >, arg, ty< ^n >)
+  static member inline Op (Kind.Nat, Op.Eq, _: ty<S<_>>, _: ty<Z>, _) = false'
+  static member inline Op (Kind.Nat, Op.Eq, _: ty<S< ^m >>, _: ty<S< ^n >>, _) = eval' ty<Eq< ^m, ^n >>
+  static member inline Op (KindAbstract.Semigroup, SemigroupOp.Add, _: ty<S< ^m >>, _: ty< ^n >, _) =
+    s <| eval' ty<Add< ^m, ^n >>
+  static member inline Op (Kind.Nat, NatOp.Sub, _: ty<S< ^m >>, _: ty<S< ^n >>, _) =
+    eval' ty<Sub< ^n, ^m >>
+  static member inline Op (Kind.Nat, NatOp.Sub, _: ty<S<_>>, _: ty< ^tm >, d) : _
+    when ^tm: (static member Kind: Kind.LambdaExpr) = d
+  static member inline Op (Kind.Nat, NatOp.Gt, _: ty<S<_>>, _: ty<Z>, _) = true'
+  static member inline Op (Kind.Nat, NatOp.Gt, _: ty<S< ^n >>, _: ty<S< ^m >>, _) =
+    eval' ty<GT< ^n, ^m >>
+  static member inline Op (Kind.Nat, NatOp.Gt, _: ty<S<_>>, _: ty< ^tm >, d) : _
+    when ^tm: (static member Kind: Kind.LambdaExpr) = d
+
 module TypeLevelOperators =
   let Z' = ty<Z>
   let inline S' (_: ty< ^N >) = ty<S< ^N >>
-  let inline (+^) (_: ty< ^M >) (_: ty< ^N >) = eval' ty<Add< ^M, ^N >>
   let inline (-^) (_: ty< ^M >) (_: ty< ^N >) = eval' ty<Sub< ^M, ^N >>
   let inline (<^) (_: ty< ^M >) (_: ty< ^N >) = eval' ty<LT< ^M, ^N >>
   let inline (>^) (_: ty< ^M >) (_: ty< ^N >) = eval' ty<GT< ^M, ^N >>
   let inline (<=^) (_: ty< ^M >) (_: ty< ^N >) = eval' ty<LTE< ^M, ^N>>
   let inline (>=^) (_: ty< ^M >) (_: ty< ^N >) = eval' ty<GTE< ^M, ^N>>
+open TypeLevelOperators
+
+type Sub<'m, 'n> with
+  static member inline Op (Kind.LambdaExpr, op, _: ty<Sub< ^h, ^t >>, arg, _) =
+    (-^)
+      (Kind.op (Kind.LambdaExpr, op, eval' ty< ^h >, arg, eval' ty< ^h >))
+      (Kind.op (Kind.LambdaExpr, op, eval' ty< ^t >, arg, eval' ty< ^t >))
+
+type GT<'m, 'n> with
+  static member inline Op (Kind.LambdaExpr, op, _: ty<GT< ^h, ^t >>, arg, _) =
+    (>^)
+      (Kind.op (Kind.LambdaExpr, op, eval' ty< ^h >, arg, eval' ty< ^h >))
+      (Kind.op (Kind.LambdaExpr, op, eval' ty< ^t >, arg, eval' ty< ^t >))
+
+type LT<'m, 'n> with
+  static member inline Op (Kind.LambdaExpr, op, _: ty<LT< ^h, ^t >>, arg, _) =
+    (<^)
+      (Kind.op (Kind.LambdaExpr, op, eval' ty< ^h >, arg, eval' ty< ^h >))
+      (Kind.op (Kind.LambdaExpr, op, eval' ty< ^t >, arg, eval' ty< ^t >))
+
+
