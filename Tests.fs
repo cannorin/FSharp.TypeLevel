@@ -59,7 +59,28 @@ let ys =
        |> cons' (S' Z' +^ S' Z')
 
 let zs =
-  List'.append xs ys
+  TypeList.append xs ys
 
-let zsContainsZero = zs |> List'.contains Z'
+let zsContainsZero = zs |> TypeList.contains Z'
 assert' zsContainsZero
+
+assert' (
+  TypeList.forall (lam' (var' Z' >^ two)) zs |> not'
+)
+
+assert' (
+  TypeList.exists (lam' (var' Z' >^ two)) zs
+)
+
+let ws = nil' |> cons' xs |> cons' xs'
+let ws' = TypeList.concat ws
+
+// assert' (TypeList.isSubset xs ws')
+
+assert' (
+  // xs |> TypeList.forall (lam' (ws' |> TypeList.contains (var' Z')))
+  let predicate = lam' (ws' |> TypeList.contains (var' Z'))
+  xs |> TypeList.forall predicate
+)
+
+//let vs = TypeList.filter (lam' (var' Z' >^ two)) zs

@@ -40,15 +40,49 @@ type Cons<'head, 'tail> with
   static member inline Op (KindAbstract.Foldable, FoldableOp.Fold, _: ty<Cons< ^h, ^t >>, (i: ty< ^init >, f: ty< ^f >), _) =
     fold' f (app' (app' f i) ty< ^h >) ty< ^t >
 
-type Contains<'item, 'list> =
-  Fold<
-    Lam<Lam<Or<Var<S<Z>>, Var<Z>>>>,
-    False,
-    Map<Lam<Eq<'item, Var<Z>>>, 'list>>
+module TypeList =
+  type IsEmpty<'list> = Eq<'list, Nil>
+  type ForAll<'predicate, 'list> =
+    Fold<
+      Lam<Lam<And<Var<S<Z>>, Var<Z>>>>,
+      True,
+      Map<'predicate, 'list>>
+  type Exists<'predicate, 'list> =
+    Fold<
+      Lam<Lam<Or<Var<S<Z>>, Var<Z>>>>,
+      False,
+      Map<'predicate, 'list>>
+  type Contains<'item, 'list> =
+    Exists<
+      Lam<Eq<'item, Var<Z>>>,
+      'list>
+  type Concat<'list> =
+    Fold<
+      Lam<Lam<Add<Var<S<Z>>, Var<Z>>>>,
+      Nil,
+      'list>
+  type Filter<'predicate, 'list> =
+    Concat<
+      Map<
+        Lam<
+          IfThenElse<
+            App<'predicate, Var<Z>>,
+            Cons<Var<Z>, Nil>,
+            Nil>>,
+        'list>>
+  type IsSubset<'sublist, 'list> =
+    ForAll<
+      Lam<Contains<Var<Z>, 'list>>,
+      'sublist>
+  type SetEquals<'xs, 'ys> =
+    And<IsSubset<'xs, 'ys>, IsSubset<'ys, 'xs>>
 
-module List' =
   let inline isEmpty xs = xs =^ nil'
   let inline append (_: ty< ^xs >) (_: ty< ^ys >) = ty< ^xs > +^ ty< ^ys >
+  let inline forall (_: ty< ^predicate >) (_: ty< ^xs >) = eval' ty<ForAll< ^predicate, ^xs >>
+  let inline exists (_: ty< ^predicate >) (_: ty< ^xs >) = eval' ty<Exists< ^predicate, ^xs >>
   let inline contains (_: ty< ^i >) (_: ty< ^xs >) : _
-    when ^i : (static member Eval: ty< ^i > -> ty< ^I >)
-     and ^xs: (static member Eval: ty< ^xs > -> ty< ^XS >) = eval' ty<Contains< ^I, ^XS>>
+    when ^i : (static member Eval: ty< ^i > -> ty< ^I >) = eval' ty<Contains< ^I, ^xs>>
+  let inline concat (_: ty< ^xs >) = eval' ty<Concat< ^xs >>
+  let inline filter (_: ty< 'predicate >) (_: ty< 'xs >) = eval' ty<Filter< 'predicate, 'xs >>
+  let inline isSubset (_: ty<'sublist>) (_: ty<'list>) = eval' ty<IsSubset<'sublist, 'list>>
