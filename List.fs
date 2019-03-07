@@ -84,5 +84,6 @@ module TypeList =
   let inline contains (_: ty< ^i >) (_: ty< ^xs >) : _
     when ^i : (static member Eval: ty< ^i > -> ty< ^I >) = eval' ty<Contains< ^I, ^xs>>
   let inline concat (_: ty< ^xs >) = eval' ty<Concat< ^xs >>
-  let inline filter (_: ty< 'predicate >) (_: ty< 'xs >) = eval' ty<Filter< 'predicate, 'xs >>
-  let inline isSubset (_: ty<'sublist>) (_: ty<'list>) = eval' ty<IsSubset<'sublist, 'list>>
+  let inline filter (_: ty<'predicate>) (_: ty<'xs>) = eval' ty<Filter< 'predicate, 'xs >>
+  let inline isSubset (_: ty<'sublist>) (_: ty<'list>) = eval' ty<IsSubset<'sublist,  'list>>
+  let inline setEquals (_: ty<'xs>) (_: ty<'ys>) = eval' ty<SetEquals<'xs, 'ys>>
